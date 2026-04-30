@@ -1,3 +1,61 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What This Repo Is
+
+This repo IS a Claude Code plugin (`superpowers-extended-cc`), a fork of [obra/superpowers](https://github.com/obra/superpowers) that ships Claude Code-native enhancements (native task management, structured task metadata, pre-commit task gate). There is no application to build or run — the artifacts are skill markdown, hook scripts, command markdown, and a plugin manifest. Editing those files IS the work.
+
+The same repo is repackaged for other harnesses (Codex, OpenCode, Cursor, Gemini) via overlay directories (`.codex/`, `.opencode/`, `.cursor-plugin/`, `gemini-extension.json`) and an `rsync`-based sync script. Changes that only make sense for one harness must not regress the others.
+
+## Repository Layout
+
+- `skills/` — the product. Each subdir is one skill with a `SKILL.md` (frontmatter `name` + `description` + body). Skills are behavior-shaping prompts loaded by the harness; the `description` field is what the model matches against to decide whether to invoke. `skills/shared/` holds cross-skill reference material (e.g. `task-format-reference.md`).
+- `hooks/` — `hooks.json` registers a `SessionStart` hook (`startup|clear|compact`) that runs `hooks/run-hook.cmd session-start`. `run-hook.cmd` is a bash/cmd polyglot wrapper so the same file works on Unix and Windows. `hooks/session-start` reads `skills/using-superpowers/SKILL.md` and emits it as `additional_context` / `additionalContext` / `hookSpecificOutput.additionalContext` depending on the host harness — that is how the bootstrap skill gets injected at session start. `hooks/examples/` holds opt-in user hooks (`pre-commit-check-tasks.sh`, `stop-deflection-guard.sh`); these are documented in the README and are NOT wired into `hooks.json`.
+- `commands/` — slash commands (`/brainstorm`, `/write-plan`, `/execute-plan`). Each is a thin wrapper that tells the model to invoke the corresponding skill.
+- `agents/` — subagent definitions (currently `code-reviewer.md`).
+- `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` — Claude Code plugin + marketplace manifests. Both carry the version.
+- `.codex/`, `.opencode/`, `.cursor-plugin/`, `gemini-extension.json` — per-harness install instructions, plugin manifests, and (for OpenCode) the `superpowers.js` plugin shim that injects bootstrap context.
+- `scripts/bump-version.sh` — single source of truth for version updates; reads `.version-bump.json` to know which files/fields to write. Always use this instead of editing version strings by hand.
+- `scripts/sync-to-codex-plugin.sh` — clones `prime-radiant-inc/openai-codex-plugins`, rsyncs `skills/` (and a small allow-list) into `plugins/superpowers/`, regenerates `.codex-plugin/plugin.json` inline from a template, and opens a PR. The `EXCLUDES` array in this script is the authoritative list of paths that do NOT ship to the embedded Codex plugin (anchored with leading `/` so e.g. `skills/brainstorming/scripts/` is preserved).
+- `tests/claude-code/` — bash test harness that drives `claude -p` in headless mode and asserts on output. `run-skill-tests.sh` is the entry point; `--integration` runs the slow end-to-end tests. `tests/{brainstorm-server,explicit-skill-requests,opencode,skill-triggering,subagent-driven-dev}/` hold harness-specific suites.
+- `docs/` — supplementary docs (per-harness READMEs, `testing.md`, screenshots, Windows notes). Not shipped inside the Codex plugin.
+
+## Commands
+
+Run from the repo root.
+
+```bash
+# Version management — never edit version strings by hand.
+scripts/bump-version.sh --check         # report current versions across all declared files
+scripts/bump-version.sh --audit         # --check + grep repo for stale version strings
+scripts/bump-version.sh 5.2.9           # bump every file listed in .version-bump.json
+
+# Skill tests (Claude Code harness). Requires `claude --version` to work.
+tests/claude-code/run-skill-tests.sh                                    # fast tests
+tests/claude-code/run-skill-tests.sh --integration                      # slow (10–30 min) end-to-end
+tests/claude-code/run-skill-tests.sh --test test-fork-validation.sh     # single test
+tests/claude-code/run-skill-tests.sh --verbose                          # show full Claude output
+tests/claude-code/run-skill-tests.sh --timeout 1800                     # custom per-test timeout
+
+# Codex sync — opens a PR against prime-radiant-inc/openai-codex-plugins.
+scripts/sync-to-codex-plugin.sh -n      # dry run, ALWAYS do this first
+scripts/sync-to-codex-plugin.sh         # apply, push, open PR (requires gh auth)
+```
+
+There is no `npm install`, no build, and no lint step. `package.json` exists only because OpenCode loads `.opencode/plugins/superpowers.js` as an ES module.
+
+## Editing Conventions Specific to This Repo
+
+- **Skill content is code, not prose.** The "Red Flags" tables, rationalization lists, and the phrase "your human partner" (deliberately not "the user") are tuned. Do not rewrite them for style. Behavior-shaping changes require adversarial multi-session evaluation — see `skills/writing-skills/`.
+- **Skill paths in user-facing strings are namespaced.** Use `superpowers:<skill>` upstream-style or `superpowers-extended-cc:<skill>` for fork-only references. The session-start hook emits `superpowers-extended-cc:using-superpowers` because that is this fork's plugin name (see `.claude-plugin/plugin.json`).
+- **Hook scripts are extensionless on purpose.** `hooks/session-start` (no `.sh`) avoids Claude Code's Windows auto-detection that prepends `bash` to anything ending in `.sh`. The polyglot `run-hook.cmd` is what dispatches to bash on either platform. Preserve this pattern when adding hooks.
+- **Cross-harness output shape matters.** `hooks/session-start` emits different JSON fields (`additional_context`, top-level `additionalContext`, or nested `hookSpecificOutput.additionalContext`) based on which env vars the host sets (`CURSOR_PLUGIN_ROOT`, `CLAUDE_PLUGIN_ROOT`, `COPILOT_CLI`). Don't unify these — Claude Code reads multiple variants without dedup.
+- **The Codex sync `EXCLUDES` list uses leading `/` to anchor patterns.** Unanchored patterns match at any depth and have silently broken nested skill `scripts/` dirs in the past. Keep new entries anchored.
+- **Version bumps touch five files.** They are listed in `.version-bump.json`. Use `bump-version.sh`; do not edit them individually.
+
+---
+
 # Superpowers — Contributor Guidelines
 
 ## If You Are an AI Agent
