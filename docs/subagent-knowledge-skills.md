@@ -21,7 +21,7 @@ The architecture's center of gravity is **skills as the unit of knowledge, contr
 
 ## Empirical evidence: subagents don't reach for skills voluntarily
 
-Across **38 real-world dispatches** of `superpowers-extended-cc:code-reviewer` spanning 5 projects (deep-wiki-agent, local-agent, mono-repo, mono-repo-domains-shared, plugins) and months of use:
+Across **38 real-world dispatches** of `claude-superpowers:code-reviewer` spanning 5 projects (deep-wiki-agent, local-agent, mono-repo, mono-repo-domains-shared, plugins) and months of use:
 
 | Metric | Value |
 |---|---|
@@ -70,7 +70,7 @@ Three additive edits, no tuned content modified:
 ## Deliberately not done
 
 ### `code-quality-reviewer-prompt.md` and the `code-reviewer` agent
-The code-quality reviewer dispatches `superpowers-extended-cc:code-reviewer` — the agent with the 38/0 empirical record. Adding a Knowledge Skills slot to the dispatch fields won't work unless the agent's *system prompt* (in `agents/code-reviewer.md`) also instructs it to invoke skills. That's a larger, riskier edit because agent system prompts are exactly the "carefully-tuned" content the contributor policy warns against modifying without eval evidence. Defer until Shape A is validated for the implementer + spec reviewer.
+The code-quality reviewer dispatches `claude-superpowers:code-reviewer` — the agent with the 38/0 empirical record. Adding a Knowledge Skills slot to the dispatch fields won't work unless the agent's *system prompt* (in `agents/code-reviewer.md`) also instructs it to invoke skills. That's a larger, riskier edit because agent system prompts are exactly the "carefully-tuned" content the contributor policy warns against modifying without eval evidence. Defer until Shape A is validated for the implementer + spec reviewer.
 
 ### Knowledge skill plugins themselves
 Domain-specific skills don't belong in superpowers core (contributor policy explicitly rejects this). They belong in separate plugins. Reference packs already downloaded at:
@@ -113,8 +113,8 @@ Can't run a real subagent dispatch from a planning conversation. Required to con
 
 **Steps:**
 1. In a real Expo/React project (suggest one of the `mono-repo` apps under `~/.claude/projects/`-pattern), open a CC session.
-2. Use `superpowers-extended-cc:writing-plans` to create a small one-task plan that touches React/Expo code (e.g., "add a new screen with a fetch call"). The task should naturally benefit from one of the installed knowledge skills.
-3. Use `superpowers-extended-cc:subagent-driven-development` to execute. The controller (this CC session) should now follow the new SKILL.md guidance: detect stack, select skills, fill the `## Knowledge Skills` slot before dispatching the implementer.
+2. Use `claude-superpowers:writing-plans` to create a small one-task plan that touches React/Expo code (e.g., "add a new screen with a fetch call"). The task should naturally benefit from one of the installed knowledge skills.
+3. Use `claude-superpowers:subagent-driven-development` to execute. The controller (this CC session) should now follow the new SKILL.md guidance: detect stack, select skills, fill the `## Knowledge Skills` slot before dispatching the implementer.
 4. After the dispatch returns, locate the transcript at `~/.claude/projects/<project-slug>/<session-id>.jsonl`.
 5. Find the implementer dispatch's `toolUseResult` and check `toolStats.otherToolCount` — and ideally the full subagent transcript if CC stores it separately.
 

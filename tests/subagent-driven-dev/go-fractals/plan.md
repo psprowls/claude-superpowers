@@ -1,6 +1,6 @@
 # Go Fractals CLI - Implementation Plan
 
-Execute this plan using the `superpowers-extended-cc:subagent-driven-development` skill.
+Execute this plan using the `claude-superpowers:subagent-driven-development` skill.
 
 ## Context
 

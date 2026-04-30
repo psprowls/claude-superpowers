@@ -61,7 +61,7 @@ digraph process {
     "Read plan, extract tasks, TaskCreate for each with full text" [shape=box];
     "More tasks remain?" [shape=diamond];
     "Dispatch final code reviewer subagent for entire implementation" [shape=box];
-    "Use superpowers-extended-cc:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
+    "Use claude-superpowers:finishing-a-development-branch" [shape=box style=filled fillcolor=lightgreen];
 
     "Read plan, extract tasks, TaskCreate for each with full text" -> "Dispatch implementer subagent (skills/subagent-driven-development/implementer-prompt.md)";
     "Dispatch implementer subagent (skills/subagent-driven-development/implementer-prompt.md)" -> "Implementer subagent asks questions?";
@@ -80,7 +80,7 @@ digraph process {
     "TaskUpdate: mark task completed" -> "More tasks remain?";
     "More tasks remain?" -> "Dispatch implementer subagent (skills/subagent-driven-development/implementer-prompt.md)" [label="yes"];
     "More tasks remain?" -> "Dispatch final code reviewer subagent for entire implementation" [label="no"];
-    "Dispatch final code reviewer subagent for entire implementation" -> "Use superpowers-extended-cc:finishing-a-development-branch";
+    "Dispatch final code reviewer subagent for entire implementation" -> "Use claude-superpowers:finishing-a-development-branch";
 }
 ```
 
@@ -94,7 +94,7 @@ When dispatching an implementer subagent:
 
 ## Stack Detection & Knowledge Skill Selection
 
-Subagents do not auto-discover skills. Empirical data: across 38 real-world dispatches of `superpowers-extended-cc:code-reviewer`, `toolStats.otherToolCount` was 0 in every case — the Skill tool was never invoked. If you want a subagent to apply domain knowledge from a skill, you MUST name the skill explicitly in its dispatch prompt.
+Subagents do not auto-discover skills. Empirical data: across 38 real-world dispatches of `claude-superpowers:code-reviewer`, `toolStats.otherToolCount` was 0 in every case — the Skill tool was never invoked. If you want a subagent to apply domain knowledge from a skill, you MUST name the skill explicitly in its dispatch prompt.
 
 Before dispatching each implementer subagent, fill the `## Knowledge Skills` section of `implementer-prompt.md` with the relevant domain skills.
 
@@ -131,7 +131,7 @@ Before dispatching each implementer subagent, fill the `## Knowledge Skills` sec
 
   - expo:native-data-fetching — Task adds a network request; this skill defines the fetch/React Query patterns we use.
   - expo:building-native-ui — Task creates a new screen component; this skill defines layout and styling conventions.
-  - superpowers-extended-cc:test-driven-development — TDD discipline for the test-first workflow this task requires.
+  - claude-superpowers:test-driven-development — TDD discipline for the test-first workflow this task requires.
 ```
 
 ## Model Selection
@@ -186,7 +186,7 @@ Task 1: Hook installation script
 
 [Get Task 1 text and context (already extracted)]
 [Detect stack: bash + node — no domain skill matches; TDD always applies]
-[Knowledge Skills slot: superpowers-extended-cc:test-driven-development — TDD discipline for test-first workflow]
+[Knowledge Skills slot: claude-superpowers:test-driven-development — TDD discipline for test-first workflow]
 [Dispatch implementation subagent with full task text + context + filled Knowledge Skills slot]
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
@@ -329,13 +329,13 @@ This ensures cross-session resume works correctly. Without this, a new session l
 ## Integration
 
 **Required workflow skills:**
-- **superpowers-extended-cc:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
-- **superpowers-extended-cc:writing-plans** - Creates the plan this skill executes
-- **superpowers-extended-cc:requesting-code-review** - Code review template for reviewer subagents
-- **superpowers-extended-cc:finishing-a-development-branch** - Complete development after all tasks
+- **claude-superpowers:using-git-worktrees** - REQUIRED: Set up isolated workspace before starting
+- **claude-superpowers:writing-plans** - Creates the plan this skill executes
+- **claude-superpowers:requesting-code-review** - Code review template for reviewer subagents
+- **claude-superpowers:finishing-a-development-branch** - Complete development after all tasks
 
 **Subagents should use:**
-- **superpowers-extended-cc:test-driven-development** - Subagents follow TDD for each task
+- **claude-superpowers:test-driven-development** - Subagents follow TDD for each task
 
 **Alternative workflow:**
-- **superpowers-extended-cc:executing-plans** - Use for parallel session instead of same-session execution
+- **claude-superpowers:executing-plans** - Use for parallel session instead of same-session execution
