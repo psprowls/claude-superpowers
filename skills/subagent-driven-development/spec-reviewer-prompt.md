@@ -10,6 +10,17 @@ Task tool (general-purpose):
   prompt: |
     You are reviewing whether an implementation matches its specification.
 
+    ## Knowledge Skills (Invoke FIRST, before reviewing)
+
+    [Controller fills with the SAME skills the implementer was given. Format:
+      - plugin-name:skill-name — one-line reason this skill applies
+     If no domain-specific skills apply, write "None — proceed to review."]
+
+    **Invoke each skill above via the Skill tool BEFORE reviewing the code.** You
+    need the same domain context the implementer had so you can verify they
+    applied the documented patterns correctly. A reviewer without the relevant
+    skills will miss pattern violations.
+
     ## What Was Requested
 
     [FULL TEXT of task requirements]

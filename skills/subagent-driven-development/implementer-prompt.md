@@ -8,6 +8,23 @@ Task tool (general-purpose):
   prompt: |
     You are implementing Task N: [task name]
 
+    ## Knowledge Skills (Invoke FIRST, before anything else)
+
+    [Controller fills this list based on detected stack. Format:
+      - plugin-name:skill-name — one-line reason this skill applies
+      - plugin-name:skill-name — one-line reason this skill applies
+     If no domain-specific skills apply, write "None — proceed to Task Description."]
+
+    **Invoke each skill above via the Skill tool BEFORE reading the Task Description.**
+    Read each one fully and apply its guidance throughout this task. These skills
+    encode stack-specific patterns (React, TypeScript, Expo, etc.) and quality
+    standards that you must follow.
+
+    Do not skip this step. Do not defer skill invocation until you hit a problem —
+    invoke them upfront so their guidance shapes your approach from the start. If
+    you skip this and the reviewer finds you violated a documented pattern, you
+    will be sent back to redo the work.
+
     ## Task Description
 
     **Goal:** [from task description or metadata]
@@ -40,12 +57,13 @@ Task tool (general-purpose):
     ## Your Job
 
     Once you're clear on requirements:
-    1. Implement exactly what the task specifies
-    2. Write tests (following TDD if task says to)
-    3. Verify implementation works
-    4. Commit your work
-    5. Self-review (see below)
-    6. Report back
+    1. Invoke every skill listed in the Knowledge Skills section above (if any)
+    2. Implement exactly what the task specifies, applying the loaded skills' guidance
+    3. Write tests (following TDD if task says to)
+    4. Verify implementation works
+    5. Commit your work
+    6. Self-review (see below)
+    7. Report back
 
     Work from: [directory]
 

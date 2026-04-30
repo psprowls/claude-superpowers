@@ -90,6 +90,49 @@ When dispatching an implementer subagent:
 1. Read the task's description via TaskGet — metadata is embedded as a `json:metadata` code fence at the end
 2. Parse the metadata JSON and map fields (files, acceptanceCriteria, verifyCommand) to the implementer prompt sections
 3. The implementer should receive ALL structured data — don't make them parse it from prose
+4. Detect the task's tech stack and fill the implementer prompt's `## Knowledge Skills` section (see below)
+
+## Stack Detection & Knowledge Skill Selection
+
+Subagents do not auto-discover skills. Empirical data: across 38 real-world dispatches of `superpowers-extended-cc:code-reviewer`, `toolStats.otherToolCount` was 0 in every case — the Skill tool was never invoked. If you want a subagent to apply domain knowledge from a skill, you MUST name the skill explicitly in its dispatch prompt.
+
+Before dispatching each implementer subagent, fill the `## Knowledge Skills` section of `implementer-prompt.md` with the relevant domain skills.
+
+**How to detect the stack:**
+1. Inspect the task's `metadata.files` and the working directory's `package.json` (or equivalent for non-JS stacks)
+2. Match dependencies and file extensions to available skills:
+   - `react` / `react-dom` / `.tsx` / `.jsx` → React knowledge skills
+   - `next` → Next.js knowledge skills
+   - `expo` / `react-native` / `app.json` / `eas.json` → Expo knowledge skills
+   - `typescript` / `tsconfig.json` / `.ts` → TypeScript knowledge skills
+   - language-specific: `pyproject.toml` (Python), `Cargo.toml` (Rust), `go.mod` (Go), etc.
+3. Look at the available skills list in your environment. Pick the ones whose `description` matches the task's stack and intent.
+
+**What to write into the slot:**
+- Up to ~5 skills per dispatch — more than that and the subagent loses focus
+- Each line: `- plugin:skill-name — one-line reason this applies to this task`
+- Reasons are required. They tell the subagent why each skill is relevant and shape how it applies the guidance.
+- If no domain skills apply, write `None — proceed to Task Description.` Do not invent skills.
+
+**Don't:**
+- List every available skill — relevance > coverage
+- Inject the same skills into every dispatch by default — pick per-task based on the files being touched
+- List skills the subagent has already loaded in a previous dispatch — each dispatch is fresh context, but list only what's needed for THIS task
+- Reference a skill that isn't installed in the environment
+
+**Do:**
+- Reuse the same selection across implementer + spec reviewer + code quality reviewer dispatches for one task — all three need the same domain context
+- Treat this as a per-task decision, not a per-plan decision — different tasks in the same plan may touch different stacks
+
+**Example slot fill:**
+
+```
+## Knowledge Skills (Invoke FIRST, before anything else)
+
+  - expo:native-data-fetching — Task adds a network request; this skill defines the fetch/React Query patterns we use.
+  - expo:building-native-ui — Task creates a new screen component; this skill defines layout and styling conventions.
+  - superpowers-extended-cc:test-driven-development — TDD discipline for the test-first workflow this task requires.
+```
 
 ## Model Selection
 
@@ -142,7 +185,9 @@ You: I'm using Subagent-Driven Development to execute this plan.
 Task 1: Hook installation script
 
 [Get Task 1 text and context (already extracted)]
-[Dispatch implementation subagent with full task text + context]
+[Detect stack: bash + node — no domain skill matches; TDD always applies]
+[Knowledge Skills slot: superpowers-extended-cc:test-driven-development — TDD discipline for test-first workflow]
+[Dispatch implementation subagent with full task text + context + filled Knowledge Skills slot]
 
 Implementer: "Before I begin - should the hook be installed at user or system level?"
 
@@ -253,6 +298,7 @@ Done!
 - Let implementer self-review replace actual review (both are needed)
 - **Start code quality review before spec compliance is ✅** (wrong order)
 - Move to next task while either review has open issues
+- **Dispatch an implementer with the `## Knowledge Skills` section blank or unset.** Either fill it with the relevant skills (with one-line reasons) or explicitly write "None — proceed to Task Description." A blank slot is a bug, not a default.
 
 **If subagent asks questions:**
 - Answer clearly and completely
