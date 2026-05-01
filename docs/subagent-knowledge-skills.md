@@ -1,6 +1,6 @@
 # Subagent Knowledge Skills — Design Notes
 
-**Status:** Shape A validated (2026-04-30). `writing-plans` extended to bake recommendations into plans (2026-04-30). Pattern is in production use; further extensions (code-reviewer agent, curated knowledge packs) deferred and tracked below.
+**Status:** Shape A validated (2026-04-30). `writing-plans` baked recommendations into plans, code-reviewer slot extended, and curated knowledge plugins (`react`, `react-native`, `nextjs`) wired into the marketplace (all 2026-04-30). Awaiting full end-to-end test exercising the multi-skill pipeline.
 **Owner:** pcvelz fork.
 
 ---
@@ -273,6 +273,46 @@ Per the original deferral note, the contributor policy bar for behavior-shaping 
 - The code-quality reviewer subagent's tool log shows `Skill` invocations matching the slot fill, before any `Read` / `Bash` / git commands.
 - The reviewer produces its standard output structure (Strengths / Issues / Recommendations / Assessment) — slot loading didn't displace the review.
 - Reviewer flags a stack-specific violation it would have missed without the skills (the eval-positive case). Or, if no violation exists, confirm review duration / token usage didn't blow up.
+
+## Curated knowledge plugins (shipped 2026-04-30)
+
+Three new plugins wired into the `psprowls-plugins` marketplace at `/Users/pat/Personal/claude-plugins/.claude-plugin/marketplace.json`. Each plugin is a thin wrapper (plugin.json + symlinked skills/) around upstream skill repos already checked out under `~/Personal/skills/`. Symlinks (not copies) so upstream `git pull` updates flow without rebundling.
+
+| Plugin | Skills | Upstream |
+|---|---|---|
+| `react` | `vercel-react-best-practices`, `vercel-composition-patterns`, `web-design-guidelines` | `vercel/agent-skills` (`~/Personal/skills/agent-skills/skills/`) |
+| `react-native` | `vercel-react-native-skills` | `vercel/agent-skills` |
+| `nextjs` | `next-best-practices`, `next-cache-components`, `next-upgrade` | `vercel/next-skills` (`~/Personal/skills/next-skills/skills/`) |
+
+**Plugin layout:**
+
+```
+/Users/pat/Personal/claude-plugins/{react,react-native,nextjs}/
+├── .claude-plugin/plugin.json
+├── README.md
+└── skills/
+    └── <skill-name>/        ← symlink to ~/Personal/skills/.../<skill>/
+```
+
+**Naming notes:**
+- The Vercel skills retain their `vercel-` frontmatter prefix to preserve attribution. Slot fills read as `react:vercel-react-best-practices` (slightly redundant but faithful to upstream).
+- `web-design-guidelines` is framework-agnostic (UI/accessibility review) but lives in `react` because that's the most likely consumer for this fork's monorepo work. If a future plan touches non-React UI, the slot fill can still reference it directly.
+
+**Install (manual, run in CC):**
+
+```
+/plugin marketplace reload psprowls-plugins
+/plugin install react@psprowls-plugins
+/plugin install react-native@psprowls-plugins
+/plugin install nextjs@psprowls-plugins
+```
+
+After install, a new session's available-skills system reminder should list 7 new skills across the three plugins.
+
+**Failure modes to watch for:**
+- Symlink target moves/deletes — plugin shows empty skill list. Re-clone upstream at expected path.
+- Two plugins with the same skill `name` — CC's namespace-by-plugin should prevent collisions (e.g., `nextjs:next-best-practices` vs `react:next-best-practices` if a future skill duplicates the name). Untested in this setup; only worth resolving if it happens.
+- The `vercel-` prefix annoyance — if it becomes a real problem, fork the SKILL.md frontmatter under our plugin dir (replace the symlink with a copy) and rename. Not doing this preemptively.
 
 ## Files referenced
 
