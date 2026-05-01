@@ -1,6 +1,6 @@
 # Subagent Knowledge Skills — Design Notes
 
-**Status:** Shape A implemented (2026-04-30). Awaiting validation dispatch.
+**Status:** Shape A validated (2026-04-30). One real-world dispatch confirmed Skill invocation; pattern is safe to extend.
 **Owner:** pcvelz fork.
 
 ---
@@ -166,6 +166,64 @@ otherToolCount still 0 even with explicit instruction
      - OR: agents-with-baked-in-skill-references for narrow, high-reliability surfaces
      - Either way: knowledge lives inline in the prompt, not behind a Skill tool call
 ```
+
+## Validation Results — 2026-04-30
+
+**Outcome: Shape A works.** One real-world dispatch produced a `Skill` invocation by the implementer subagent. The "explicit instruction overrides default behavior" hypothesis holds in the n=1 case; pre-existing 38/0 baseline now reads 38/0 + 1/1.
+
+### Setup
+
+- **Repo under test:** `/Users/pat/Personal/mono-repo` (pnpm + Turborepo monorepo with an Expo SDK 54 app at `apps/app-expo-ts`).
+- **Knowledge skill plugin installed via marketplace path:** `expo@psprowls-plugins` (11 skills, including `expo:building-native-ui`). Step (a) of "Next moves" satisfied via marketplace install rather than the cheaper single-file alternative.
+- **Instrumentation added for evidence capture:** `PostToolUse` hook with matcher `Skill` writing one JSON line per invocation to `/tmp/skill-invocations.log`. Configured in `<repo>/.claude/settings.json`. Captures `ts`, `session_id`, `skill`, `args`. Cross-referenced with `OTEL_LOG_TOOL_DETAILS=1` already exporting to a local SigNoz instance — but the hook log alone was sufficient.
+
+### Dispatch
+
+- **Plan:** one-task plan (`docs/superpowers/plans/2026-04-30-validation-about-screen.md` in the consumer repo) — add a static About screen to the Expo app's settings stack. Three file edits: create `about.tsx`, register `<Stack.Screen>` in `_layout.tsx`, add a `List.Item` row in `index.tsx`.
+- **Knowledge Skills slot fill:**
+  ```
+  - expo:building-native-ui — implementer is creating a new Expo Router file-based screen,
+    registering it in the Stack navigator, and adding a navigation row from a List screen.
+    The skill covers screen patterns, Stack.Screen options, file-based routing
+    conventions, and Link/router.push usage that this task uses end-to-end.
+  ```
+- **Subagent type/model:** `general-purpose` / `sonnet`. Reinforcing language added to the dispatch prompt: "THIS IS NOT OPTIONAL. The very first tool call you make in this task must be the Skill tool with skill='expo:building-native-ui'. Do not read files, do not run bash, do not edit anything before that Skill call."
+
+### Evidence
+
+Hook log after the run, three entries, all under the same `session_id`:
+
+```json
+{"ts":"...:38:07Z","session":"f679...","skill":"claude-superpowers:writing-plans","args":"..."}
+{"ts":"...:42:45Z","session":"f679...","skill":"claude-superpowers:subagent-driven-development","args":"..."}
+{"ts":"...:44:02Z","session":"f679...","skill":"expo:building-native-ui","args":null}
+```
+
+Lines 1–2 are controller-side calls. **Line 3 is the implementer subagent's call** — the validation answer. The subagent's self-report ("invoked `expo:building-native-ui` as the very first tool call") matches the timestamp evidence.
+
+The implementation also passed both `pnpm check-types` and `pnpm lint:check` (exit 0), and produced a clean single-feature commit. Imports came from `@psprowls/shared-ui-native-ts` (not `react-native`) and used custom NativeWind tokens (`bg-surface`, `text-primary`, `text-text-secondary`) — exactly the patterns the package's CLAUDE.md mandates and the kind of stack-specific guidance the skill is supposed to inject. Without the Knowledge Skills slot, the n=1 prediction is the subagent would have used `react-native` imports and standard Tailwind palette names (or hex colors). With it: clean fit on first try.
+
+### Architectural findings worth recording
+
+1. **Subagent tool calls share the parent's `session_id` and fire the parent's `PostToolUse` hooks.** The doc's earlier hedge ("if not present, look for a sibling subagent transcript file") can be retired — there is no separate subagent JSONL on this version of CC. The parent transcript is the single source of truth; a hook on the parent process catches subagent tool use too.
+2. **A 3-line `PostToolUse` hook + `OTEL_LOG_TOOL_DETAILS=1` is overkill for this validation.** Either alone is sufficient. Future runs can drop the OTel cross-check and rely on the hook log, which is faster to consume.
+3. **IDE diagnostics false-positive:** the editor's TypeScript server flagged `Property 'className' does not exist on type 'ScrollViewProps'` immediately after the implementer's writes, but `tsc --noEmit` passed. Root cause is the LSP not loading `nativewind-env.d.ts` augmentations in time. This matters for future review-pipeline patterns: any naive "scrape IDE diagnostics" reviewer would have rejected a correct implementation. The authoritative signal is `tsc`, not the editor's diagnostic stream.
+4. **Subagent honesty held up.** The dispatched agent's claim "check-types passed" was true even when the IDE diagnostics suggested otherwise. Trust-but-verify still warranted, but the agent did not fabricate a result.
+
+### Recommended next moves (now unblocked)
+
+Shape A green path applies:
+
+- **(High value, low risk)** Update `writing-plans` to suggest stack-relevant skills at plan-creation time, so the controller doesn't have to detect stack at dispatch time. The plan would carry the recommended Knowledge Skills list per task.
+- **(High value, medium risk)** Build curated `superpowers-knowledge-react` / `-expo` / `-typescript` plugins under your fork. Each is a small SKILL.md set that captures stack patterns the implementer should default to. Only proceed once you've used existing 3rd-party packs (expo, next, vercel-react) for a few weeks and have a sense of what overlaps and what's missing.
+- **(Riskier, eval-gated)** Extend the pattern to `code-quality-reviewer-prompt.md` and the underlying `code-reviewer` agent. Adding a slot to the dispatch fields is cheap; modifying `agents/code-reviewer.md`'s system prompt is the part the contributor policy warns about. Run a small eval set first — same code change, with vs. without slot, observe whether spec compliance and code quality improve.
+- **(Reproducibility)** Capture future validation runs in this same doc (or a sibling `validation-results.md`). The hook + OTel + JSONL stack is now a proven recipe; new runs should add to a results table rather than rediscover the methodology.
+
+### Open questions for follow-up validation
+
+- **n=1 is not n=many.** This run used `sonnet` and a relatively distinctive skill (`expo:building-native-ui`) on a task with strong fit. Does the pattern hold for `haiku` (cheaper) and for less distinctive skills? Worth a sweep.
+- **Multiple skills in one slot:** when 3+ skills are listed, does the subagent invoke all of them? Or does it cherry-pick? Untested.
+- **Slot drift:** if the controller fills the slot with skills that don't exist (typo, plugin uninstalled), does the subagent silently no-op or error visibly? Untested.
 
 ## Files referenced
 
