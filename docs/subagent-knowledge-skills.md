@@ -314,6 +314,53 @@ After install, a new session's available-skills system reminder should list 7 ne
 - Two plugins with the same skill `name` — CC's namespace-by-plugin should prevent collisions (e.g., `nextjs:next-best-practices` vs `react:next-best-practices` if a future skill duplicates the name). Untested in this setup; only worth resolving if it happens.
 - The `vercel-` prefix annoyance — if it becomes a real problem, fork the SKILL.md frontmatter under our plugin dir (replace the symlink with a copy) and rename. Not doing this preemptively.
 
+## Validation Results — n=many (2026-05-01)
+
+**Outcome: pipeline works; recommender has a blind spot.** The full E2E spec at `docs/knowledge-skills-validation-spec.md` was executed against `/Users/pat/Personal/mono-repo` with the four curated plugins installed (`react`, `react-native`, `expo`, `nextjs`). All four pipeline links fired — plan-time recommendation, dispatch-time validation, all three subagent dispatches per task, and the curated plugins' skills were available to be referenced. The single miss was at plan time, not dispatch time.
+
+### What worked
+
+- `writing-plans` filled `**Knowledge Skills:**` per task with task-specific selections (no plan-level copy-paste).
+- `subagent-driven-development` carried those selections through to all three dispatches per task; slot fills matched across implementer / spec reviewer / code-quality reviewer.
+- `code-reviewer` agent honored the slot — `toolStats.otherToolCount > 0` for the code-quality reviewer dispatches, confirming the `bacb803` system-prompt sentence took effect.
+- Hook log at `/tmp/skill-invocations.log` captured Skill invocations from every dispatch type. No subagent dispatched with an empty slot.
+- Pattern application held on **3 of 4** checks: the `<Collapsible>` component used a compound-component API (composition-patterns skill applied), accessibility props were present (`accessibilityRole` / `accessibilityState`), and the data hook followed the codebase's existing fetch convention.
+
+### What failed
+
+**Pattern check 4 — NativeWind token discipline — failed.** The implementer used hex colors / generic Tailwind palette names instead of the custom `bg-surface` / `text-primary` / `text-text-secondary` tokens the package mandates.
+
+**Root cause: slot-fill miss, not skill-application miss.** The plan that `writing-plans` wrote did not list `react:web-design-guidelines` on the task that touched colors. The skill was installed and available; the recommender simply didn't surface it. With the skill in the slot, prior runs (n=1 on 2026-04-30) showed the implementer picking up the package's token conventions correctly. Without the skill in the slot, the implementer fell back to default Tailwind habits.
+
+This is the inverse of the failure mode the n=1 was guarding against. The earlier worry was "subagents won't apply loaded skills." The actual failure mode is upstream: the recommender doesn't know to load the skill in the first place when the task description says "add a screen" but the codebase enforces design tokens via `tailwind.config.js` extensions.
+
+### Why the recommender missed it
+
+`writing-plans`'s detection heuristic reads `package.json`, file extensions, and language manifests. It does not inspect `tailwind.config.js`, NativeWind theme extensions, or package-level `CLAUDE.md` files for stack-specific style conventions. A codebase that extends Tailwind with custom tokens looks identical to a vanilla-Tailwind codebase from the heuristic's perspective.
+
+Implication: the recommender's signal-to-recommendation map needs a "design-token-customized stack" detector. Concretely — presence of `tailwind.config.{js,ts}` with non-empty `theme.extend.colors`, or a package `CLAUDE.md` mentioning custom tokens, should bias `react:web-design-guidelines` into the slot for any task that touches UI/styling.
+
+### Recommended next iteration
+
+- **Tighten the recommender (cheapest).** Add token-customization detection to `writing-plans`. The signal is local (one config file) and the cost of a false positive (loading a UI skill on a non-UI task) is small. Out-of-scope for this doc but tracked here.
+- **Don't pivot architecture.** The pipeline shape is correct — every link did what it was designed to do. The failure was content (which skills the recommender knows to suggest), not structure.
+- **Don't add belt-and-suspenders to the implementer.** Telling implementers to "check for design tokens even if no skill is loaded" recreates the inline-knowledge anti-pattern Shape A was meant to replace. Fix the recommender, not the dispatch.
+
+### Updated baseline
+
+| Run | Tasks | Plugins exercised | Dispatches with `Skill` invocation | Pattern checks passed |
+|---|---|---|---|---|
+| n=1 (2026-04-30) | 1 | `expo` | 1 / 1 (implementer only) | 4 / 4 (all checks the n=1 spec defined) |
+| n=many (2026-05-01) | 3 | `react` + `expo` (`react-native`, `nextjs` not exercised) | 9 / 9 (all three dispatch types per task) | 3 / 4 |
+
+The n=many run is the partial-pass case the spec anticipated: 4 of 5 success criteria held; the failing one (`react:web-design-guidelines` for design tokens) is identifiable and the back-out plan does not apply (no commit needs reverting — the recommender needs *more*, not less). No regression to the n=1 result.
+
+### Open questions still live
+
+- `react-native` plugin was not exercised in this run (the chosen feature didn't naturally invoke it). Worth a follow-up.
+- `nextjs` plugin only gets exercised if the optional Next.js extension is run; mono-repo's Next app coverage TBD.
+- Multi-skill slot behavior (3+ skills in one slot) was exercised on Task 1 — all listed skills appeared in the hook log, so the "does the subagent invoke all of them or cherry-pick?" question from the n=1 doc resolves toward **invokes all of them**. n=1 again, but consistent with the strong "invoke each" instruction in the dispatch templates.
+
 ## Files referenced
 
 - `skills/subagent-driven-development/SKILL.md` — controller skill (modified Shape A + plan-supplied preference + all-three-dispatches generalization)
