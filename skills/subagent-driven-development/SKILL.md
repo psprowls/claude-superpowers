@@ -96,7 +96,12 @@ When dispatching an implementer subagent:
 
 Subagents do not auto-discover skills. Empirical data: across 38 real-world dispatches of `claude-superpowers:code-reviewer`, `toolStats.otherToolCount` was 0 in every case — the Skill tool was never invoked. If you want a subagent to apply domain knowledge from a skill, you MUST name the skill explicitly in its dispatch prompt.
 
-Before dispatching each implementer subagent, fill the `## Knowledge Skills` section of `implementer-prompt.md` with the relevant domain skills.
+All three dispatch templates (implementer, spec reviewer, code quality reviewer) carry a Knowledge Skills slot:
+- `implementer-prompt.md` — `## Knowledge Skills` section in the inline prompt
+- `spec-reviewer-prompt.md` — `## Knowledge Skills` section in the inline prompt
+- `code-quality-reviewer-prompt.md` — `KNOWLEDGE_SKILLS:` template variable, rendered into `requesting-code-review/code-reviewer.md`'s `## Knowledge Skills` section
+
+Pick the skill list once per task and reuse it across all three dispatches — implementer needs them to write the right patterns, spec reviewer needs them to verify the patterns were applied, code quality reviewer needs them to evaluate code quality against documented standards.
 
 **Prefer plan-supplied recommendations.** If `claude-superpowers:writing-plans` was used to create the plan, each task should already carry a `**Knowledge Skills:**` field (and a `knowledgeSkills` array in `metadata`). Use those — the plan author already detected the stack with full context. Validate the listed skills appear in the current available-skills system reminder before dispatching. If a listed skill is missing (plugin uninstalled, name typo), strip that line and proceed; do not fabricate a substitute.
 
@@ -301,7 +306,7 @@ Done!
 - Let implementer self-review replace actual review (both are needed)
 - **Start code quality review before spec compliance is ✅** (wrong order)
 - Move to next task while either review has open issues
-- **Dispatch an implementer with the `## Knowledge Skills` section blank or unset.** Either fill it with the relevant skills (with one-line reasons) or explicitly write "None — proceed to Task Description." A blank slot is a bug, not a default.
+- **Dispatch any of the three subagents (implementer, spec reviewer, code quality reviewer) with the `## Knowledge Skills` section blank or unset.** Either fill it with the relevant skills (with one-line reasons) or explicitly write "None — proceed without skill loading." A blank slot is a bug, not a default. Drift between the three dispatches' slot fills is also a bug — they must match.
 
 **If subagent asks questions:**
 - Answer clearly and completely

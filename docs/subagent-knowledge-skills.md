@@ -69,9 +69,6 @@ Three additive edits, no tuned content modified:
 
 ## Deliberately not done
 
-### `code-quality-reviewer-prompt.md` and the `code-reviewer` agent
-The code-quality reviewer dispatches `claude-superpowers:code-reviewer` — the agent with the 38/0 empirical record. Adding a Knowledge Skills slot to the dispatch fields won't work unless the agent's *system prompt* (in `agents/code-reviewer.md`) also instructs it to invoke skills. That's a larger, riskier edit because agent system prompts are exactly the "carefully-tuned" content the contributor policy warns against modifying without eval evidence. Defer until Shape A is validated for the implementer + spec reviewer.
-
 ### Knowledge skill plugins themselves
 Domain-specific skills don't belong in superpowers core (contributor policy explicitly rejects this). They belong in separate plugins. Reference packs already downloaded at:
 
@@ -245,7 +242,6 @@ Implements next-move (a) from the prior section: shift Knowledge Skill selection
 
 - `executing-plans` — that skill executes plans in a session where the user/main agent is the worker, not via subagent dispatch. The `Skill` tool is natively available there; no slot is needed. If executing-plans starts dispatching subagents in the future, mirror the SDD changes.
 - `brainstorming` — the brainstorming skill produces specs, not implementation plans. Knowledge Skill selection happens one layer down (writing-plans).
-- The `code-reviewer` agent and `code-quality-reviewer-prompt.md` — still deferred, still eval-gated. See "Recommended next moves" above.
 
 **What to verify on next live use:**
 
@@ -253,14 +249,40 @@ Implements next-move (a) from the prior section: shift Knowledge Skill selection
 - Then dispatch via `subagent-driven-development`. Confirm the controller reads the plan-supplied list rather than re-detecting (you should see the slot filled identically to what the plan said). Hook log at `/tmp/skill-invocations.log` should still show the implementer invoking the listed skills.
 - If a plan-supplied skill is uninstalled, confirm SDD strips it instead of dispatching with a broken name. Probably worth manually testing this edge case once.
 
+## Code-reviewer slot extension (shipped 2026-04-30)
+
+Implements the second next-move from the validation results section: extend the Knowledge Skills pattern to the code-quality reviewer dispatch. This was the eval-gated edit because it touches the `code-reviewer` agent system prompt — "carefully-tuned" content per the contributor policy. We're shipping to the fork now and validating in the same end-to-end test that exercises the writing-plans changes.
+
+**Edits:**
+
+- `skills/requesting-code-review/code-reviewer.md` — new `## Knowledge Skills (Invoke FIRST, before reviewing)` section near the top with a `{KNOWLEDGE_SKILLS}` placeholder. Strong "invoke first, before reading any code or running git commands" instruction; explicit empty case (`None — proceed to review.`).
+- `skills/subagent-driven-development/code-quality-reviewer-prompt.md` — `KNOWLEDGE_SKILLS:` template field added to the dispatch fields list. Note instructing the controller to use the same slot fill as implementer + spec reviewer.
+- `agents/code-reviewer.md` — one additive sentence after the opening "Senior Code Reviewer" line: "If your dispatch prompt contains a `## Knowledge Skills` section listing one or more skills, invoke each via the Skill tool before any other action..." Does not restructure the six review sections; does not change the senior-reviewer voice.
+- `skills/subagent-driven-development/SKILL.md` — Stack Detection section now lists all three dispatch templates and notes the slot fill must match across them. Red Flag bullet generalized from "implementer" to "any of the three subagents".
+
+**Why this is lower-risk than feared:**
+
+The validation dispatch (2026-04-30) showed the implementer subagent (`general-purpose` agent type, no custom system prompt) honored an "invoke skill X first" instruction in its dispatch prompt. The code-reviewer agent has a custom system prompt but it doesn't conflict with the instruction — it tells the agent what review sections to produce, not what to do first. Adding a sentence to the system prompt that says "honor the slot if present" is belt-and-suspenders; the dispatch-side instruction alone is probably sufficient. Either way, the change is additive — nothing is removed or restructured.
+
+**Eval still required:**
+
+Per the original deferral note, the contributor policy bar for behavior-shaping changes is real. The full end-to-end test (next move: install curated knowledge plugins, run a multi-task plan through writing-plans → subagent-driven-development) will surface any regression. If the code-reviewer agent starts misbehaving (skipping reviews, getting stuck on skill loading, or applying skill guidance to areas it shouldn't), back this change out and pivot to dispatch-side instruction only.
+
+**What to verify in the full test:**
+
+- The code-quality reviewer subagent's tool log shows `Skill` invocations matching the slot fill, before any `Read` / `Bash` / git commands.
+- The reviewer produces its standard output structure (Strengths / Issues / Recommendations / Assessment) — slot loading didn't displace the review.
+- Reviewer flags a stack-specific violation it would have missed without the skills (the eval-positive case). Or, if no violation exists, confirm review duration / token usage didn't blow up.
+
 ## Files referenced
 
-- `skills/subagent-driven-development/SKILL.md` — controller skill (modified twice: Shape A slot + plan-supplied preference)
+- `skills/subagent-driven-development/SKILL.md` — controller skill (modified Shape A + plan-supplied preference + all-three-dispatches generalization)
 - `skills/subagent-driven-development/implementer-prompt.md` — implementer dispatch template (modified)
 - `skills/subagent-driven-development/spec-reviewer-prompt.md` — spec reviewer dispatch template (modified)
-- `skills/subagent-driven-development/code-quality-reviewer-prompt.md` — code quality reviewer dispatch template (NOT modified; deferred)
+- `skills/subagent-driven-development/code-quality-reviewer-prompt.md` — code quality reviewer dispatch template (modified: KNOWLEDGE_SKILLS field added)
+- `skills/requesting-code-review/code-reviewer.md` — code review prompt template (modified: Knowledge Skills section + placeholder)
 - `skills/writing-plans/SKILL.md` — plan author skill (modified to recommend skills per task at plan-creation time)
 - `skills/shared/task-format-reference.md` — task metadata schema (added `knowledgeSkills`)
-- `agents/code-reviewer.md` — code-reviewer agent system prompt (NOT modified; deferred)
+- `agents/code-reviewer.md` — code-reviewer agent system prompt (modified: one additive sentence to honor the slot)
 - `skills/using-superpowers/SKILL.md` — see `<SUBAGENT-STOP>` marker (line 6) for why subagents don't auto-bootstrap
 - `CLAUDE.md` — contributor policy. Domain skills must live in separate plugins, not core.
