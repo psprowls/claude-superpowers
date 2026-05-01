@@ -36,6 +36,7 @@ Embed metadata as a `json:metadata` code fence at the end of the TaskCreate desc
 | `files` | string[] | yes | Paths to create/modify/delete |
 | `verifyCommand` | string | yes | Command to verify task completion |
 | `acceptanceCriteria` | string[] | yes | List of testable criteria |
+| `knowledgeSkills` | string[] | no | Lines of `plugin:skill-name — reason` to inject into the subagent dispatch's `## Knowledge Skills` slot. Empty array when no domain skills apply. See `claude-superpowers:writing-plans` for selection rules. |
 | `estimatedScope` | "small" \| "medium" \| "large" | no | Relative effort indicator |
 
 ### Example

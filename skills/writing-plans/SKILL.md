@@ -37,6 +37,23 @@ Before defining tasks, map out which files will be created or modified and what 
 
 This structure informs the task decomposition. Each task should produce self-contained changes that make sense independently.
 
+## Knowledge Skill Recommendations
+
+Subagents dispatched by `subagent-driven-development` do not auto-discover skills — see `claude-superpowers:subagent-driven-development` for the empirical 38/0 finding. To get a subagent to apply stack-specific guidance (React patterns, Expo routing, TypeScript strictness), the skill name must appear in its dispatch prompt.
+
+**Decide which skills apply at plan-creation time, per task.** You already have the working directory and you know what each task touches — bake the recommendation into the task so the controller doesn't have to re-detect at dispatch time.
+
+**Detection:** inspect `package.json` dependencies, file extensions in the files this plan will touch, and language manifests (`pyproject.toml`, `Cargo.toml`, `go.mod`). Cross-reference with the available-skills system reminder to find skills whose `description` matches the task's stack and intent. Only list skills you can see in the available-skills list — do not invent or assume.
+
+**Per-task selection rules:**
+- Up to ~5 skills. More and the subagent loses focus.
+- One line per skill: `- plugin:skill-name — one-line reason this applies to this task`. Reasons are mandatory; they shape how the subagent applies the guidance.
+- Per-task, not per-plan — different tasks may touch different stacks (a backend handler task and a UI task in the same plan should pick different skills).
+- If no domain skills apply (pure config edit, doc-only task, trivial rename), write `None — proceed without skill loading.` Do not pad with marginal matches.
+- `claude-superpowers:test-driven-development` belongs only on tasks that actually involve a TDD cycle, not on pure refactors or doc tasks.
+
+Fill the `**Knowledge Skills:**` field in each task's structure (see below) and mirror it as `knowledgeSkills` in the metadata JSON.
+
 ## REQUIRED FIRST STEP: Initialize Task Tracking
 
 **BEFORE exploring code or writing the plan, you MUST:**
@@ -100,6 +117,10 @@ Key principle: TDD cycles happen WITHIN tasks, not as separate tasks. A task is 
 
 **Verify:** `exact test command` → expected output
 
+**Knowledge Skills:**
+- plugin:skill-name — one-line reason this applies to this task
+- plugin:skill-name — one-line reason this applies to this task
+
 **Steps:**
 
 - [ ] **Step 1: Write the failing test**
@@ -160,6 +181,8 @@ After writing the complete plan, look at the spec with fresh eyes and check the 
 **2. Placeholder scan:** Search your plan for red flags — any of the patterns from the "No Placeholders" section above. Fix them.
 
 **3. Type consistency:** Do the types, method signatures, and property names you used in later tasks match what you defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a bug.
+
+**4. Knowledge Skills filled:** Does every task have a `**Knowledge Skills:**` field, either listing relevant skills with reasons or explicitly saying `None — proceed without skill loading.`? An empty or missing field is a bug — see "Knowledge Skill Recommendations" above. Also confirm `knowledgeSkills` appears in each task's metadata JSON.
 
 If you find issues, fix them inline. No need to re-review — just fix and move on. If you find a spec requirement with no task, add the task.
 
@@ -225,7 +248,7 @@ TaskCreate:
     [Key actions from task's Steps — abbreviated]
 
     ```json:metadata
-    {"files": ["path/to/file1.py"], "verifyCommand": "pytest tests/path/ -v", "acceptanceCriteria": ["criterion 1", "criterion 2"]}
+    {"files": ["path/to/file1.py"], "verifyCommand": "pytest tests/path/ -v", "acceptanceCriteria": ["criterion 1", "criterion 2"], "knowledgeSkills": ["plugin:skill-name — one-line reason this applies to this task"]}
     ```
   activeForm: "Implementing [Component Name]"
 ```
@@ -279,14 +302,14 @@ If the plan is saved to `docs/superpowers/plans/2026-01-15-feature.md`, the task
       "id": 0,
       "subject": "Task 0: ...",
       "status": "pending",
-      "description": "**Goal:** ...\n\n**Files:**\n...\n\n```json:metadata\n{\"files\": [\"path/to/file.py\"], \"verifyCommand\": \"pytest tests/ -v\", \"acceptanceCriteria\": [\"criterion 1\"]}\n```"
+      "description": "**Goal:** ...\n\n**Files:**\n...\n\n```json:metadata\n{\"files\": [\"path/to/file.py\"], \"verifyCommand\": \"pytest tests/ -v\", \"acceptanceCriteria\": [\"criterion 1\"], \"knowledgeSkills\": [\"plugin:skill-name — reason\"]}\n```"
     },
     {
       "id": 1,
       "subject": "Task 1: ...",
       "status": "pending",
       "blockedBy": [0],
-      "description": "**Goal:** ...\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": []}\n```"
+      "description": "**Goal:** ...\n\n```json:metadata\n{\"files\": [], \"verifyCommand\": \"\", \"acceptanceCriteria\": [], \"knowledgeSkills\": []}\n```"
     }
   ],
   "lastUpdated": "<timestamp>"

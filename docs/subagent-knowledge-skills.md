@@ -1,6 +1,6 @@
 # Subagent Knowledge Skills — Design Notes
 
-**Status:** Shape A validated (2026-04-30). One real-world dispatch confirmed Skill invocation; pattern is safe to extend.
+**Status:** Shape A validated (2026-04-30). `writing-plans` extended to bake recommendations into plans (2026-04-30). Pattern is in production use; further extensions (code-reviewer agent, curated knowledge packs) deferred and tracked below.
 **Owner:** pcvelz fork.
 
 ---
@@ -225,12 +225,42 @@ Shape A green path applies:
 - **Multiple skills in one slot:** when 3+ skills are listed, does the subagent invoke all of them? Or does it cherry-pick? Untested.
 - **Slot drift:** if the controller fills the slot with skills that don't exist (typo, plugin uninstalled), does the subagent silently no-op or error visibly? Untested.
 
+## Plan-time recommendation (shipped 2026-04-30)
+
+Implements next-move (a) from the prior section: shift Knowledge Skill selection from dispatch time (controller-side) to plan-creation time (plan-author-side).
+
+**Edits:**
+
+- `skills/writing-plans/SKILL.md` — new `## Knowledge Skill Recommendations` section explaining the 38/0 finding (by reference, not duplicated), detection heuristic, and per-task selection rules. Task Structure template grew a `**Knowledge Skills:**` field between `**Verify:**` and `**Steps:**`. Self-Review checklist gained item 4 (verify the field is filled on every task). Native Task metadata example and Task Persistence example now include a `knowledgeSkills` array.
+- `skills/shared/task-format-reference.md` — `knowledgeSkills` added to the metadata schema table as an optional `string[]`.
+- `skills/subagent-driven-development/SKILL.md` — Stack Detection section now reads "Prefer plan-supplied recommendations" first, with detection-at-dispatch-time documented as the fallback for plans authored without writing-plans. Includes a validation step: strip listed skills that aren't in the current available-skills system reminder rather than fabricating substitutes.
+
+**Why this shape:**
+
+- The plan author has full context — they're inspecting the working directory, looking at file extensions for tasks they're actively writing, and seeing the available-skills list at plan-creation time. Asking the controller to redo this work at dispatch time wastes effort and risks drift if the dispatching session has different installed plugins (the SDD validation step handles that case explicitly).
+- Per-task remains the right granularity. Different tasks in the same plan may touch different stacks; baking a single plan-level default would lose that.
+- Empty arrays are explicit (`None — proceed without skill loading.`) rather than missing. Missing is a plan bug; explicit empty is a valid choice for trivial tasks (config edits, doc changes).
+
+**Deliberately not changed:**
+
+- `executing-plans` — that skill executes plans in a session where the user/main agent is the worker, not via subagent dispatch. The `Skill` tool is natively available there; no slot is needed. If executing-plans starts dispatching subagents in the future, mirror the SDD changes.
+- `brainstorming` — the brainstorming skill produces specs, not implementation plans. Knowledge Skill selection happens one layer down (writing-plans).
+- The `code-reviewer` agent and `code-quality-reviewer-prompt.md` — still deferred, still eval-gated. See "Recommended next moves" above.
+
+**What to verify on next live use:**
+
+- Open a fresh CC session, run `claude-superpowers:writing-plans` against a real task in `mono-repo`. Confirm the plan written to disk contains `**Knowledge Skills:**` per task and `knowledgeSkills` in the embedded metadata JSON.
+- Then dispatch via `subagent-driven-development`. Confirm the controller reads the plan-supplied list rather than re-detecting (you should see the slot filled identically to what the plan said). Hook log at `/tmp/skill-invocations.log` should still show the implementer invoking the listed skills.
+- If a plan-supplied skill is uninstalled, confirm SDD strips it instead of dispatching with a broken name. Probably worth manually testing this edge case once.
+
 ## Files referenced
 
-- `skills/subagent-driven-development/SKILL.md` — controller skill (modified)
+- `skills/subagent-driven-development/SKILL.md` — controller skill (modified twice: Shape A slot + plan-supplied preference)
 - `skills/subagent-driven-development/implementer-prompt.md` — implementer dispatch template (modified)
 - `skills/subagent-driven-development/spec-reviewer-prompt.md` — spec reviewer dispatch template (modified)
 - `skills/subagent-driven-development/code-quality-reviewer-prompt.md` — code quality reviewer dispatch template (NOT modified; deferred)
+- `skills/writing-plans/SKILL.md` — plan author skill (modified to recommend skills per task at plan-creation time)
+- `skills/shared/task-format-reference.md` — task metadata schema (added `knowledgeSkills`)
 - `agents/code-reviewer.md` — code-reviewer agent system prompt (NOT modified; deferred)
 - `skills/using-superpowers/SKILL.md` — see `<SUBAGENT-STOP>` marker (line 6) for why subagents don't auto-bootstrap
 - `CLAUDE.md` — contributor policy. Domain skills must live in separate plugins, not core.

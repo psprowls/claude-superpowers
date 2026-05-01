@@ -98,7 +98,10 @@ Subagents do not auto-discover skills. Empirical data: across 38 real-world disp
 
 Before dispatching each implementer subagent, fill the `## Knowledge Skills` section of `implementer-prompt.md` with the relevant domain skills.
 
-**How to detect the stack:**
+**Prefer plan-supplied recommendations.** If `claude-superpowers:writing-plans` was used to create the plan, each task should already carry a `**Knowledge Skills:**` field (and a `knowledgeSkills` array in `metadata`). Use those — the plan author already detected the stack with full context. Validate the listed skills appear in the current available-skills system reminder before dispatching. If a listed skill is missing (plugin uninstalled, name typo), strip that line and proceed; do not fabricate a substitute.
+
+**Only run detection here when the plan didn't supply Knowledge Skills.** Older plans, plans authored without writing-plans, or tasks added ad-hoc may have an empty/missing field — fall back to detecting at dispatch time:
+
 1. Inspect the task's `metadata.files` and the working directory's `package.json` (or equivalent for non-JS stacks)
 2. Match dependencies and file extensions to available skills:
    - `react` / `react-dom` / `.tsx` / `.jsx` → React knowledge skills
